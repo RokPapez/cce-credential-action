@@ -1,33 +1,33 @@
-import * as core from '@actions/core'
-import * as io from '@actions/io'
-import * as cp from 'child_process'
-import * as utils from './utils'
-import * as context from './context'
-import {v4 as uuidv4} from 'uuid'
-import * as toolCache from '@actions/tool-cache'
-import * as fs from 'fs'
-import * as util from 'util'
+import * as core from "@actions/core";
+import * as io from "@actions/io";
+import * as cp from "child_process";
+import * as utils from "./utils";
+import * as context from "./context";
+import { v4 as uuidv4 } from "uuid";
+import * as toolCache from "@actions/tool-cache";
+import * as fs from "fs";
+import * as util from "util";
 
 export async function checkAndInstallKubectl(): Promise<boolean> {
     if (!(await checkKubectlInstall())) {
-        await installOrUpdateKubectl()
-        return await checkKubectlInstall()
+        await installOrUpdateKubectl();
+        return await checkKubectlInstall();
     }
-    return true
+    return true;
 }
 /**
  * 检查sshpass是否已经在系统上完成安装，并输出版本
  * @returns
  */
 export async function checkKubectlInstall(): Promise<boolean> {
-    const kubectlPath = await io.which('kubectl')
+    const kubectlPath = await io.which("kubectl");
     if (!kubectlPath) {
-        core.info('kubectl did not installed or set to the path')
-        return false
+        core.info("kubectl did not installed or set to the path");
+        return false;
     }
-    core.info('kubectl already installed and set to path: ' + kubectlPath)
-    await utils.execCommand(`${kubectlPath} version`)
-    return true
+    core.info("kubectl already installed and set to path: " + kubectlPath);
+    await utils.execCommand(`${kubectlPath} version --client`);
+    return true;
 }
 
 /**
@@ -35,42 +35,42 @@ export async function checkKubectlInstall(): Promise<boolean> {
  * @returns
  */
 export async function getLatestKubectlStableVersion(): Promise<string> {
-    core.info('latest tag api address ' + context.KUBECTL_LATEST_STABLE_URL)
-    const tmpKubectlVersionDownloadDir = './tmp/kubectl/' + uuidv4()
+    core.info("latest tag api address " + context.KUBECTL_LATEST_STABLE_URL);
+    const tmpKubectlVersionDownloadDir = "./tmp/kubectl/" + uuidv4();
     return await toolCache
         .downloadTool(
             context.KUBECTL_LATEST_STABLE_URL,
-            tmpKubectlVersionDownloadDir
+            tmpKubectlVersionDownloadDir,
         )
         .then(
-            kubectlDownloadPath => {
+            (kubectlDownloadPath) => {
                 core.info(
-                    'kubectlVersionTmpDownloadPath ' + kubectlDownloadPath
-                )
+                    "kubectlVersionTmpDownloadPath " + kubectlDownloadPath,
+                );
                 const kubectlLatestStableVersion = fs
-                    .readFileSync(kubectlDownloadPath, 'utf8')
+                    .readFileSync(kubectlDownloadPath, "utf8")
                     .toString()
-                    .trim()
+                    .trim();
                 if (!kubectlLatestStableVersion) {
-                    return context.KUBECTL_STABLE_VERSION
+                    return context.KUBECTL_STABLE_VERSION;
                 }
                 core.info(
-                    'latest kubectl version ' + kubectlLatestStableVersion
-                )
-                return kubectlLatestStableVersion
+                    "latest kubectl version " + kubectlLatestStableVersion,
+                );
+                return kubectlLatestStableVersion;
             },
-            error => {
-                core.info('error ' + error)
+            (error) => {
+                core.info("error " + error);
                 core.warning(
                     util.format(
-                        'Failed to read latest kubectl verison from %s. Using default stable version %s',
+                        "Failed to read latest kubectl verison from %s. Using default stable version %s",
                         context.KUBECTL_LATEST_STABLE_URL,
-                        context.KUBECTL_STABLE_VERSION
-                    )
-                )
-                return context.KUBECTL_STABLE_VERSION
-            }
-        )
+                        context.KUBECTL_STABLE_VERSION,
+                    ),
+                );
+                return context.KUBECTL_STABLE_VERSION;
+            },
+        );
 }
 
 /**
@@ -80,72 +80,72 @@ export async function getLatestKubectlStableVersion(): Promise<string> {
  * 将软件包的权限设置为755
  */
 export async function installOrUpdateKubectl() {
-    const osArch = utils.getOSArch()
-    const osPlatform = utils.getOSPlatform()
-    const installName = utils.getKubectlNameByPlatform(osPlatform)
+    const osArch = utils.getOSArch();
+    const osPlatform = utils.getOSPlatform();
+    const installName = utils.getKubectlNameByPlatform(osPlatform);
     core.info(
-        'osArch : ' +
+        "osArch : " +
             osArch +
-            ' osPlatform : ' +
+            " osPlatform : " +
             osPlatform +
-            ' installName : ' +
-            installName
-    )
+            " installName : " +
+            installName,
+    );
     if (
         !context.osSupportArchs.includes(osArch) ||
         !context.osSupportPlatforms.includes(osPlatform)
     ) {
-        core.info('kubectl can not install on this platform or arch')
-        return
+        core.info("kubectl can not install on this platform or arch");
+        return;
     }
-    const currentArch = utils.getOSArch4Kubectl(osArch)
-    const kubectlLatestStableVersion = await getLatestKubectlStableVersion()
+    const currentArch = utils.getOSArch4Kubectl(osArch);
+    const kubectlLatestStableVersion = await getLatestKubectlStableVersion();
     const kubectlDownloadUrl = getKubectlLatestStableDownloadUrl(
         kubectlLatestStableVersion,
         osPlatform,
         currentArch,
-        installName
-    )
-    const kubectlDownloadPath = await getKubectlDownlodPath(kubectlDownloadUrl)
+        installName,
+    );
+    const kubectlDownloadPath = await getKubectlDownlodPath(kubectlDownloadUrl);
     if (utils.checkParameterIsNull(kubectlDownloadPath)) {
-        core.info('download kubectl failed')
-        return
+        core.info("download kubectl failed");
+        return;
     }
-    if (osPlatform === 'win32') {
+    if (osPlatform === "win32") {
         await utils.execCommand(
-            'copy ' +
+            "copy " +
                 kubectlDownloadPath +
-                ' ' +
+                " " +
                 context.WINDOWS_KUBECTL_INSTALL_PATH +
-                '/' +
-                context.WINDOWS_KUBECTL_INSTALL_NAME
-        )
+                "/" +
+                context.WINDOWS_KUBECTL_INSTALL_NAME,
+        );
     } else {
         await utils.execCommand(
-            'sudo cp ' +
+            "sudo cp " +
                 kubectlDownloadPath +
-                ' ' +
+                " " +
                 context.LINUX_KUBECTL_INSTALL_PATH +
-                '/' +
-                context.LINUX_KUBECTL_INSTALL_NAME
-        )
+                "/" +
+                context.LINUX_KUBECTL_INSTALL_NAME,
+        );
         await utils.execCommand(
-            'sudo chmod ' +
+            "sudo chmod " +
                 context.LINUX_KUBECTL_MOD +
-                ' ' +
+                " " +
                 context.LINUX_KUBECTL_INSTALL_PATH +
-                '/' +
-                context.LINUX_KUBECTL_INSTALL_NAME
-        )
+                "/" +
+                context.LINUX_KUBECTL_INSTALL_NAME,
+        );
     }
 
-    fs.rmSync(kubectlDownloadPath)
+    fs.rmSync(kubectlDownloadPath);
     core.info(
-        'install or update new kubect version : ' +
+        "install or update new kubect version : " +
             (await utils.execCommand(
-                'which kubectl && kubectl version'
-            ))
-    )
+                "which kubectl && kubectl version",
+            )),
+    );
 }
 
 /**
@@ -154,32 +154,31 @@ export async function installOrUpdateKubectl() {
  * @returns
  */
 export async function getKubectlDownlodPath(
-    kubectlDownloadUrl: string
+    kubectlDownloadUrl: string,
 ): Promise<string> {
-    const tmpKubectlDownloadDir = './tmp/kubectl'
-    const tmpKubectlDownloadPath =
-        tmpKubectlDownloadDir +
-        '/' +
-        kubectlDownloadUrl.substring(kubectlDownloadUrl.lastIndexOf('/') + 1)
-    let kubectlDownloadPath = ''
+    const tmpKubectlDownloadDir = "./tmp/kubectl";
+    const tmpKubectlDownloadPath = tmpKubectlDownloadDir +
+        "/" +
+        kubectlDownloadUrl.substring(kubectlDownloadUrl.lastIndexOf("/") + 1);
+    let kubectlDownloadPath = "";
     try {
         core.info(
-            'download kubectl for install or update from ' + kubectlDownloadUrl
-        )
+            "download kubectl for install or update from " + kubectlDownloadUrl,
+        );
         kubectlDownloadPath = await toolCache.downloadTool(
             kubectlDownloadUrl,
-            tmpKubectlDownloadPath
-        )
+            tmpKubectlDownloadPath,
+        );
     } catch (error) {
         core.info(
-            'Failed to download kubectl from ' +
+            "Failed to download kubectl from " +
                 kubectlDownloadUrl +
-                ' error info ' +
-                error
-        )
+                " error info " +
+                error,
+        );
     }
-    core.info(kubectlDownloadPath)
-    return kubectlDownloadPath
+    core.info(kubectlDownloadPath);
+    return kubectlDownloadPath;
 }
 
 /**
@@ -194,24 +193,24 @@ export function getKubectlLatestStableDownloadUrl(
     stableVersion: string,
     osPlatform: string,
     osArch: string,
-    kubectlName: string
+    kubectlName: string,
 ): string {
     const kubectlDownloadUrl = util.format(
         context.KUBECTL_DOWNLOAD_URL,
         stableVersion,
         osPlatform,
         osArch,
-        kubectlName
-    )
+        kubectlName,
+    );
     core.info(
-        'download kubectl version : ' +
+        "download kubectl version : " +
             stableVersion +
-            ' for current ' +
+            " for current " +
             osArch +
-            ' platform ' +
+            " platform " +
             osPlatform +
-            ',download url ' +
-            kubectlDownloadUrl
-    )
-    return kubectlDownloadUrl
+            ",download url " +
+            kubectlDownloadUrl,
+    );
+    return kubectlDownloadUrl;
 }
